@@ -341,8 +341,8 @@ input[type=range]:disabled{opacity:.3;cursor:not-allowed}
   .help-wrap{font-size:14px}.lv{font-size:18px}
 }
 @media (pointer:coarse) and (orientation:portrait){
-  #game{justify-content:flex-start}
-  #boardWrap{margin:auto 0}
+  #game{justify-content:flex-start;padding-left:calc(6px + var(--safe-l));padding-right:calc(6px + var(--safe-r))}
+  #boardWrap{margin:auto 0;padding:6px}
 }
 @media (hover:none){
   .bt:not(.pulse):hover{background:var(--panel-2);color:var(--cyan)}
@@ -359,9 +359,10 @@ input[type=range]:disabled{opacity:.3;cursor:not-allowed}
   .bt:active,.mnu:active,.btn:active,.lv:active{background:rgba(0,240,255,.18)}
 }
 @media (orientation:landscape) and (max-height:520px){
-  #game{display:grid;grid-template-columns:1fr 168px;grid-template-rows:auto 1fr auto;
-    column-gap:10px;row-gap:8px;align-items:center;justify-items:center}
-  #boardWrap{grid-column:1;grid-row:1/4;margin:0}
+  #game{display:grid;grid-template-columns:1fr var(--side,150px);grid-template-rows:auto 1fr auto;
+    column-gap:8px;row-gap:8px;align-items:center;justify-items:center;
+    padding:calc(6px + var(--safe-t)) calc(8px + var(--safe-r)) calc(6px + var(--safe-b)) calc(8px + var(--safe-l))}
+  #boardWrap{grid-column:1;grid-row:1/4;margin:0;padding:5px}
   #hud{grid-column:2;grid-row:1;width:100%;flex-wrap:wrap}
   .hud-item{flex:1 1 50%}
   #btns{grid-column:2;grid-row:3;width:100%;grid-template-columns:1fr}
@@ -1456,9 +1457,9 @@ function rotAdvice(idx){
   if(!matchMedia('(hover:none) and (pointer:coarse)').matches)return null;
   const a=Math.min(innerWidth,innerHeight),b=Math.max(innerWidth,innerHeight);
   if(a>600)return null;
-  const cfg=LEVELS[idx],pad=36;
+  const cfg=LEVELS[idx],pad=26;
   const cp=Math.min((a-pad)/cfg.cols,(b-170-pad)/cfg.rows);
-  const cl=Math.min((b-178-pad)/cfg.cols,(a-pad)/cfg.rows);
+  const cl=Math.min((b-148-pad)/cfg.cols,(a-pad)/cfg.rows);
   const land=innerWidth>innerHeight,cur=land?cl:cp,oth=land?cp:cl;
   return (oth>cur*1.12&&cur<48)?(land?'portrait':'landscape'):null;
 }
@@ -1894,12 +1895,13 @@ function fit(){
   const framePad=(parseFloat(getComputedStyle($('#boardWrap')).paddingLeft)||12)*2;
   const side=matchMedia('(orientation:landscape) and (max-height:520px)').matches;
   const gaps=2*(parseFloat(gcs.rowGap)||10);
+  const SIDE_MIN=140,SIDE_MAX=210,colGap=8;
   const maxH=side?availH-framePad:availH-hudH-btnsH-gaps-framePad;
-  const maxW=side?availW-178-framePad:availW-framePad;
+  const maxW=side?availW-SIDE_MIN-colGap-framePad:availW-framePad;
 
   const gc=level>=0?cols:10,gr=level>=0?rows:8;
   const csRaw=Math.min(maxW/gc,maxH/gr);
-  cs=Math.max(14,Math.floor(csRaw*100)/100);
+  cs=Math.max(14,Math.floor(csRaw));
 
   const bw=cols*cs,bh=rows*cs;
   board.width=bw*DPR;board.height=bh*DPR;
@@ -1907,6 +1909,8 @@ function fit(){
   boardBuf.width=bw*DPR;boardBuf.height=bh*DPR;
 
   $('#game').style.setProperty('--bw',bw+'px');
+  // панель в горизонтали: занимает только остаток ширины, всё остальное — поле
+  $('#game').style.setProperty('--side',Math.max(SIDE_MIN,Math.min(SIDE_MAX,availW-bw-framePad-colGap))+'px');
 
   boardDirty=true;
   if(grid&&grid.length)rebuildBoardBuf();
