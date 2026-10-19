@@ -388,13 +388,22 @@ input[type=range]:disabled{opacity:.3;cursor:not-allowed}
 .boot-bar{width:min(260px,70vw);height:3px;background:var(--line)}
 .boot-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--magenta));
   box-shadow:0 0 10px var(--cyan)}
-#boot.on .boot-bar i{animation:bar 2s linear forwards}
+#boot.on .boot-bar i{animation:bar var(--bd,2s) linear forwards}
 @keyframes bar{to{width:100%}}
+#bootRot{min-height:1.4em;display:flex;align-items:center;justify-content:center;gap:8px;
+  font:12px 'Share Tech Mono',monospace;letter-spacing:.14em;color:var(--yellow);text-shadow:0 0 8px rgba(245,216,0,.6)}
+#bootRot .ic,#rotHint .ic{display:inline-block;font-size:20px;animation:rot 2s ease-in-out infinite}
+#rotHint{position:fixed;left:50%;top:calc(54px + var(--safe-t));transform:translate(-50%,-12px);opacity:0;
+  pointer-events:none;z-index:25;padding:8px 14px;display:flex;align-items:center;gap:8px;white-space:nowrap;
+  font:12px 'Share Tech Mono',monospace;letter-spacing:.1em;color:var(--yellow);background:var(--panel);
+  border:1px solid var(--yellow);transition:opacity .25s,transform .25s}
+#rotHint.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 </style>
 </head>
 <body>
 <canvas id="bg"></canvas>
 <div id="toast"></div>
+<div id="rotHint"></div>
 
 <div id="game">
   <div id="hud">
@@ -433,6 +442,7 @@ input[type=range]:disabled{opacity:.3;cursor:not-allowed}
   <div class="boot-box">
     <pre id="bootTerm"></pre>
     <div id="bootTitle"></div>
+    <div id="bootRot"></div>
     <div class="boot-bar"><i></i></div>
     <div class="sys-line">НАЖМИТЕ, ЧТОБЫ ПРОПУСТИТЬ</div>
   </div>
@@ -456,7 +466,7 @@ input[type=range]:disabled{opacity:.3;cursor:not-allowed}
     <button class="mnu" id="bSettings">Настройки</button>
     <button class="mnu" id="bAbout">Об игре</button>
   </div>
-  <div class="sys-line">ПРОГРЕСС <b id="mProgress">0/30</b> · <b id="mScore">0</b> ОЧКОВ</div>
+  
 </div>
 
 <div class="screen" id="levels">
@@ -1441,12 +1451,33 @@ function rebuildRemainingResolvable(){
 
 /* ═══════════════ ИГРОВОЙ ЦИКЛ ═══════════════ */
 /* ═══ Экран «вход в систему»: кодовый дождь + название уровня ═══ */
+/* Подсказка про поворот телефона: считаем размер плитки в обеих ориентациях */
+function rotAdvice(idx){
+  if(!matchMedia('(hover:none) and (pointer:coarse)').matches)return null;
+  const a=Math.min(innerWidth,innerHeight),b=Math.max(innerWidth,innerHeight);
+  if(a>600)return null;
+  const cfg=LEVELS[idx],pad=36;
+  const cp=Math.min((a-pad)/cfg.cols,(b-170-pad)/cfg.rows);
+  const cl=Math.min((b-178-pad)/cfg.cols,(a-pad)/cfg.rows);
+  const land=innerWidth>innerHeight,cur=land?cl:cp,oth=land?cp:cl;
+  return (oth>cur*1.12&&cur<48)?(land?'portrait':'landscape'):null;
+}
+let rotT;
+function showRot(idx){
+  const adv=rotAdvice(idx),h=$('#rotHint');
+  clearTimeout(rotT);
+  if(!adv){h.classList.remove('on');return;}
+  h.innerHTML='<span class="ic">📱</span>ЛУЧШЕ ИГРАТЬ '+(adv==='landscape'?'ГОРИЗОНТАЛЬНО':'ВЕРТИКАЛЬНО');
+  h.classList.add('on');rotT=setTimeout(()=>h.classList.remove('on'),6000);
+}
+$('#rotHint').onclick=()=>$('#rotHint').classList.remove('on');
 let booting=false;
 function runBoot(idx,done){
   if(booting)return;
   booting=true;gameState='boot';
   const el=$('#boot'),cv=$('#bootCv'),x=cv.getContext('2d'),term=$('#bootTerm'),ttl=$('#bootTitle');
   const cfg=LEVELS[idx],num=String(idx+1).padStart(2,'0');
+  const adv=rotAdvice(idx),T=adv?3400:2000;
   cv.width=innerWidth>>1;cv.height=innerHeight>>1;
   const fs=14,n=Math.ceil(cv.width/fs);
   const drops=Array.from({length:n},()=>-Math.random()*40);
@@ -1457,6 +1488,7 @@ function runBoot(idx,done){
   ttl.innerHTML='<small>УРОВЕНЬ '+num+' / '+LEVELS.length+'</small><b>'+cfg.name+'</b>';
   term.textContent='';
   x.fillStyle='#040408';x.fillRect(0,0,cv.width,cv.height);
+  el.style.setProperty('--bd',T+'ms');$('#bootRot').innerHTML='';
   el.classList.add('on');
   const t0=performance.now();let raf,fin=false;
   function finish(){
@@ -1476,8 +1508,9 @@ function runBoot(idx,done){
     }
     const m=Math.min(lines.length,Math.floor(k/420));
     term.textContent=lines.slice(0,m).join('\n')+(m<lines.length?'\n█':'');
-    if(k>1150)ttl.classList.add('in');
-    if(k>=2000)return finish();
+    if(k>1150){ttl.classList.add('in');
+      if(adv&&!$('#bootRot').innerHTML)$('#bootRot').innerHTML='<span class="ic">📱</span>РЕКОМЕНДУЕМ: '+(adv==='landscape'?'ГОРИЗОНТАЛЬНЫЙ':'ВЕРТИКАЛЬНЫЙ')+' РЕЖИМ';}
+    if(k>=T)return finish();
     raf=requestAnimationFrame(frame);
   }
   el.onpointerdown=finish;
@@ -1494,7 +1527,7 @@ function startLevelNow(idx){
   show(null);
   fit();
   updateHUD();
-  Audio_.spinUp();
+  Audio_.spinUp();showRot(idx);
 }
 function winLevel(){
   gameState='won';
@@ -1847,6 +1880,7 @@ function updateHUD(){
 function fit(){
   const mobile=matchMedia('(hover:none) and (pointer:coarse)').matches;
   DPR=Math.min(devicePixelRatio||1,mobile?1.5:2);
+  if(!rotAdvice(level))$('#rotHint').classList.remove('on');
 
   const game=$('#game');
   const gcs=getComputedStyle(game);
@@ -2013,11 +2047,7 @@ $('#bPause').onclick=pauseGame;
 $('#bSnd').onclick=()=>Audio_.setEnabled(!S.snd);
 $('#bSndPause').onclick=()=>Audio_.setEnabled(!S.snd);
 
-function updateMenuStats(){
-  const clearedCount=Object.keys(S.cleared).length;
-  $('#mProgress').textContent=clearedCount+'/'+LEVELS.length;
-  $('#mScore').textContent=(S.totalScore||0);
-}
+function updateMenuStats(){}
 
 (function initSoundUI(){
   const vr=$('#volRange'),vl=$('#volVal');
